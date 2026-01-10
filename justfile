@@ -25,7 +25,15 @@ watch:
 
 # Build production Docker image
 docker-build:
-    docker build --target production -t {{docker_image}}:{{docker_tag}} .
+    docker build -f Dockerfile -t {{docker_image}}:{{docker_tag}} .
+
+# Build builder image
+docker-build-builder:
+    docker build -f Dockerfile.builder -t {{docker_image}}-builder:{{docker_tag}} .
+
+# Build dev image
+docker-build-dev:
+    docker build -f Dockerfile.dev -t {{docker_image}}-dev:{{docker_tag}} .
 
 # Run production Docker image
 docker-run:

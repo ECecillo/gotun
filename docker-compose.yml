@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: .
-      target: development
+      dockerfile: Dockerfile.dev
     ports:
       - "8080:8080"
     develop:
@@ -21,7 +21,7 @@ services:
             - LICENSE
             - .gitignore
             - .dockerignore
-            - Dockerfile
+            - Dockerfile*
             - docker-compose.yml
             - justfile
             - .vscode/
@@ -35,8 +35,16 @@ services:
   app-prod:
     build:
       context: .
-      target: production
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     profiles:
       - prod
+
+  # Optional: Builder service for testing builds
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.builder
+    profiles:
+      - builder
