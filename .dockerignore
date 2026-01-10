@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Documentation
+README.md
+LICENSE
+*.md
+
+# Development
+tmp/
+.vscode/
+.idea/
+.DS_Store
+docker-compose.yml
+
+# Build artifacts
+tun
+*.test
+*.out
+coverage.*
+
+# Dependencies
+vendor/
+
+# Environment
+.env
+.env.*
+
+# Plans
+.claude/

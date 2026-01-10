@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: .
+      target: development
+    ports:
+      - "8080:8080"
+    develop:
+      watch:
+        # Rebuild when Go source files change
+        - action: rebuild
+          path: .
+          target: /app
+          ignore:
+            - .git/
+            - .github/
+            - tmp/
+            - .air/
+            - vendor/
+            - "*.md"
+            - LICENSE
+            - .gitignore
+            - .dockerignore
+            - Dockerfile
+            - docker-compose.yml
+            - justfile
+            - .vscode/
+            - .idea/
+            - .DS_Store
+            - "*.test"
+            - "*.out"
+            - coverage.*
+
+  # Production service (for testing production image locally)
+  app-prod:
+    build:
+      context: .
+      target: production
+    ports:
+      - "8080:8080"
+    profiles:
+      - prod
