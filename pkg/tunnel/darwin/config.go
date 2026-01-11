@@ -1,0 +1,135 @@
+//go:build darwin
+
+package darwin
+
+import (
+	"fmt"
+	"log"
+	"net"
+	"unsafe"
+
+	"golang.org/x/sys/unix"
+)
+
+// Ifreq represents an interface request structure for ioctl calls.
+type Ifreq struct {
+	Name [16]byte
+	Data [16]byte
+}
+
+// InterfaceConfigurator handles network interface configuration operations.
+type InterfaceConfigurator struct {
+	fd int
+}
+
+// NewInterfaceConfigurator creates a new interface configurator with a network manager socket.
+func NewInterfaceConfigurator() (*InterfaceConfigurator, error) {
+	fd, err := OpenKernelNetworkManagerSocket()
+	if err != nil {
+		return nil, fmt.Errorf("unable to open a socket to our kernel network manager, err: %w", err)
+	}
+	return &InterfaceConfigurator{fd: fd}, nil
+}
+
+// Close closes the network manager socket.
+func (ic *InterfaceConfigurator) Close() error {
+	if err := unix.Close(ic.fd); err != nil {
+		return fmt.Errorf("unable to close the socket to our kernel network manager, err: %w", err)
+	}
+	return nil
+}
+
+// ConfigureInterface is the code equivalent of the following ifconfig command:
+//
+// ifconfig utun_interface_name 10.0.0.2 10.0.0.1 up
+func (ic *InterfaceConfigurator) ConfigureInterface(utunInterfaceName string, sourceIP, destinationIP net.IP) error {
+	if err := ic.setSourceAddr(utunInterfaceName, sourceIP); err != nil {
+		return fmt.Errorf("unable to set utun IPv4 source address interface, err: %w", err)
+	}
+
+	if err := ic.setDestinationAddr(utunInterfaceName, destinationIP); err != nil {
+		return fmt.Errorf("unable to set utun IPv4 destination address interface, err: %w", err)
+	}
+
+	if err := ic.setInterfaceUP(utunInterfaceName); err != nil {
+		return fmt.Errorf("unable to set utun interface UP, err: %w", err)
+	}
+
+	log.Printf("successfully configured interface %s with source %s and destination %s", utunInterfaceName, sourceIP, destinationIP)
+	return nil
+}
+
+func (ic *InterfaceConfigurator) setSourceAddr(utunInterfaceName string, sourceIP net.IP) error {
+	return ic.setInterfaceIP(utunInterfaceName, sourceIP, unix.SIOCSIFADDR) //nolint:staticcheck
+}
+
+func (ic *InterfaceConfigurator) setDestinationAddr(utunInterfaceName string, destinationIP net.IP) error {
+	return ic.setInterfaceIP(utunInterfaceName, destinationIP, unix.SIOCSIFDSTADDR) //nolint:staticcheck
+}
+
+func (ic *InterfaceConfigurator) setInterfaceIP(utunInterfaceName string, ipAddr net.IP, command uintptr) error {
+	var ifreq Ifreq
+	copy(ifreq.Name[:], []byte(utunInterfaceName))
+
+	// sin_len is the size of the following sockaddr variable
+	// representing a struct used by our kernel controller to set
+	// the IP of our UTUN network Interface.
+	sinLen := 16
+	ifreq.Data[0] = byte(sinLen)
+	sinFamily := unix.AF_INET
+	ifreq.Data[1] = byte(sinFamily)
+	// [2:4] contain the port number, but since we want to have it to 0
+	// (interface don't have port number here) we won't set anything.
+	copy(ifreq.Data[4:8], ipAddr)
+	// [8:16] contain padding, let it to 0.
+
+	// we make the syscall manually since we have no existing method in unix package
+	// to do IOCTL call.
+	if _, _, errno := unix.Syscall(
+		unix.SYS_IOCTL, //nolint:staticcheck
+		uintptr(ic.fd),
+		command,
+		uintptr(unsafe.Pointer(&ifreq)),
+	); errno != 0 {
+		return fmt.Errorf("unable to set the ip address of our utun interface, error number: %v", errno)
+	}
+
+	return nil
+}
+
+func (ic *InterfaceConfigurator) setInterfaceUP(utunInterfaceName string) error {
+	var ifr Ifreq
+	copy(ifr.Name[:], []byte(utunInterfaceName))
+
+	// same here, no matching unix method for this call.
+	if _, _, errno := unix.Syscall(
+		unix.SYS_IOCTL, //nolint:staticcheck
+		uintptr(ic.fd),
+		unix.SIOCGIFFLAGS, //nolint:staticcheck
+		uintptr(unsafe.Pointer(&ifr)),
+	); errno != 0 {
+		return fmt.Errorf("unable to get interface flags with kernel controller, error number: %v", errno)
+	}
+
+	// MacOS is in Little Endian so weak bytes are on the left, start left.
+	currentFlags := uint16(ifr.Data[0]) | uint16(ifr.Data[1])<<8
+	// we will add to existing flag the UP flag and RUNNING which
+	// can be useful for MacOS to process our packets.
+	newFlags := currentFlags | unix.IFF_UP | unix.IFF_RUNNING
+
+	ifr.Data[0] = byte(newFlags)
+	ifr.Data[1] = byte(newFlags >> 8)
+
+	// ask kernel controller to use updated Data as new flags for our
+	// UTUN interface
+	if _, _, errno := unix.Syscall(
+		unix.SYS_IOCTL, //nolint:staticcheck
+		uintptr(ic.fd),
+		uintptr(unix.SIOCSIFFLAGS), //nolint:staticcheck
+		uintptr(unsafe.Pointer(&ifr)),
+	); errno != 0 {
+		return fmt.Errorf("unable to set interface flags with kernel controller, error: %v", errno)
+	}
+
+	return nil
+}

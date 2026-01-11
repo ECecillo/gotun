@@ -81,7 +81,8 @@ just
 .
 ├── cmd/
 │   └── tun/
-│       └── main.go          # UTUN implementation
+│       └── macos/
+│           └── main.go          # UTUN implementation
 ├── .github/
 │   └── workflows/
 │       ├── lint.yml         # Linting workflow
