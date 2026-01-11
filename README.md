@@ -158,7 +158,7 @@ just docker-prod
 
 ## CI/CD
 
-The project includes GitHub Actions workflows for automated testing and releases.
+The project includes GitHub Actions workflows for automated testing, code quality checks, and releases.
 
 ### Testing Workflow
 
@@ -166,6 +166,20 @@ Runs on every push to `main` and all pull requests:
 - Runs tests with race detector
 - Generates coverage reports
 - Uploads coverage artifacts
+
+### Lint Workflow
+
+Runs on every push to `main` and all pull requests:
+- Executes golangci-lint with 5-minute timeout
+- Checks for code quality issues and best practices
+- Fails build if any linting issues are found
+
+### Format Workflow
+
+Runs on every push to `main` and all pull requests:
+- Checks code formatting with gofmt
+- Ensures all Go files follow standard formatting
+- Fails build if any files are not properly formatted
 
 ### Release Workflow
 
@@ -206,6 +220,8 @@ docker run --rm -p 8080:8080 ghcr.io/ececillo/gotun:latest
 ├── .github/
 │   └── workflows/
 │       ├── test.yml         # CI testing workflow
+│       ├── lint.yml         # Linting workflow
+│       ├── format.yml       # Code formatting check workflow
 │       └── release.yml      # Release and publish workflow
 ├── Dockerfile               # Multi-stage Docker build
 ├── docker-compose.yml       # Compose with watch mode
