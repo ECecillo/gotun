@@ -1,54 +1,59 @@
 # gotun
 
-A Go application with complete Docker, development tooling, and CI/CD setup.
+A macOS userspace tunnel (UTUN) implementation in Go that creates and configures network interfaces using kernel control sockets.
+
+## Platform Support
+
+**macOS only** - This project uses macOS-specific kernel control interfaces (`com.apple.net.utun_control`) and will not compile or run on Linux or Windows.
 
 ## Prerequisites
 
+- macOS (tested on macOS 10.15+)
 - [Go](https://go.dev/doc/install) 1.25.5 or later
-- [Docker](https://docs.docker.com/get-docker/) 24.0+ with Compose v2.22.0+
 - [Just](https://github.com/casey/just#installation) command runner (optional but recommended)
+- Root/sudo privileges (required for kernel network operations)
 
 ### Installing Just
 
 ```bash
 # macOS
 brew install just
-
-# Linux
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-
-# Or use Cargo
-cargo install just
 ```
 
 ## Quick Start
 
-### Local Development
+### Build and Run
 
 ```bash
 # Build the binary
 just build
 
-# Run the application
-just run
+# Run with sudo (required for kernel operations)
+just run-sudo
 
-# Or combine both
-go run ./cmd/tun
+# Or manually
+go build -o tun ./cmd/tun
+sudo ./tun
 ```
 
-### Development with Auto-Reload
+## What This Does
 
-Run with Docker Compose watch mode for automatic rebuilds on file changes:
+The program:
+1. Opens a kernel control socket to communicate with the macOS kernel
+2. Retrieves the UTUN (User Tunnel) controller ID via IOCTL calls
+3. Connects to the UTUN controller
+4. Creates a new virtual network interface (utun0, utun1, etc.)
+5. Configures the interface with IP addresses:
+   - Source: 10.0.0.2
+   - Destination: 10.0.0.1
+6. Brings the interface UP and marks it as RUNNING
 
+This is equivalent to running:
 ```bash
-just watch
+ifconfig utun0 10.0.0.2 10.0.0.1 up
 ```
 
-This will:
-- Build the development Docker image
-- Start the container
-- Watch for file changes
-- Automatically rebuild and restart on changes
+But done programmatically through direct kernel syscalls.
 
 ## Available Commands
 
@@ -58,114 +63,64 @@ Run `just` to see all available commands:
 just
 ```
 
-### Local Development
+### Development Commands
 
 | Command | Description |
 |---------|-------------|
 | `just build` | Build the binary locally |
-| `just run` | Build and run the binary |
+| `just run-sudo` | Build and run with sudo |
 | `just test` | Run tests with race detector and coverage |
 | `just fmt` | Format Go code |
 | `just lint` | Run golangci-lint (requires installation) |
 | `just clean` | Remove build artifacts and caches |
+| `just security` | Run security checks with gosec |
 
-### Docker Commands
+## Project Structure
 
-| Command | Description |
-|---------|-------------|
-| `just watch` | Run with auto-reload (recommended for development) |
-| `just docker-build` | Build production Docker image |
-| `just docker-run` | Run production Docker image |
-| `just docker-build-run` | Build and run production image |
-| `just docker-up` | Start development container with Compose |
-| `just docker-up-d` | Start development container in detached mode |
-| `just docker-down` | Stop and remove containers |
-| `just docker-prod` | Run production container locally |
-| `just docker-logs` | View container logs |
-
-## Development Workflow
-
-### Using Docker Compose Watch (Recommended)
-
-The project includes Docker Compose with watch mode for the best development experience:
-
-```bash
-# Start watch mode
-just watch
-
-# Make changes to your Go files
-# The container will automatically rebuild and restart
+```
+.
+├── cmd/
+│   └── tun/
+│       └── main.go          # UTUN implementation
+├── .github/
+│   └── workflows/
+│       ├── lint.yml         # Linting workflow
+│       └── format.yml       # Code formatting check workflow
+├── justfile                 # Task runner recipes
+├── go.mod                   # Go module definition
+└── README.md               # This file
 ```
 
-Press `Ctrl+C` to stop.
+## How It Works
 
-### Manual Docker Compose
+### Kernel Control Sockets
 
-```bash
-# Start containers
-docker compose up
+The program uses macOS kernel control sockets to communicate directly with the kernel's network subsystem:
 
-# Run in background
-docker compose up -d
+1. **AF_SYSTEM + AF_SYS_CONTROL**: Creates a socket for kernel-level communication
+2. **IOCTL calls**: Retrieves controller information and configures network interfaces
+3. **Direct syscalls**: Uses `unix.Syscall` for low-level IOCTL operations not exposed by the Go standard library
 
-# View logs
-docker compose logs -f
+### Key Components
 
-# Stop containers
-docker compose down
-```
+- `openKernelControlSocket()`: Establishes connection to kernel control subsystem
+- `retrieveUTUNControllerIDFromKernelController()`: Gets UTUN controller ID via IOCTL
+- `connectToUTUNController()`: Connects to the UTUN controller
+- `askForUTUNNetworkInterfaceName()`: Retrieves assigned interface name (utun0, etc.)
+- `configureUTUNIPInterface()`: Sets IP addresses and brings interface UP
 
-### Testing Locally
+## Security Considerations
 
-```bash
-# Run tests
-just test
+This program requires root privileges because it:
+- Creates kernel control sockets
+- Modifies network interfaces
+- Performs low-level kernel operations
 
-# Or use go directly
-go test -v ./...
-
-# With coverage
-go test -v -race -coverprofile=coverage.out ./...
-```
-
-## Docker Images
-
-### Development Image
-
-Built from `golang:1.25.5-alpine` with full development tools.
-
-```bash
-docker compose up
-```
-
-### Production Image
-
-Optimized multi-stage build using Alpine Linux (~10-20MB):
-- Static binary with stripped symbols
-- Runs as non-root user
-- Minimal attack surface
-
-```bash
-# Build
-just docker-build
-
-# Run
-just docker-run
-
-# Or use docker-compose with prod profile
-just docker-prod
-```
+Always review code before running with sudo.
 
 ## CI/CD
 
-The project includes GitHub Actions workflows for automated testing, code quality checks, and releases.
-
-### Testing Workflow
-
-Runs on every push to `main` and all pull requests:
-- Runs tests with race detector
-- Generates coverage reports
-- Uploads coverage artifacts
+The project includes GitHub Actions workflows for automated code quality checks:
 
 ### Lint Workflow
 
@@ -181,119 +136,20 @@ Runs on every push to `main` and all pull requests:
 - Ensures all Go files follow standard formatting
 - Fails build if any files are not properly formatted
 
-### Release Workflow
-
-Triggered when pushing version tags (e.g., `v1.0.0`):
-
-```bash
-# Create and push a release tag
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-This will:
-- Build Docker images for `linux/amd64` and `linux/arm64`
-- Push to GitHub Container Registry (ghcr.io)
-- Tag with semantic versioning: `v0.1.0`, `v0.1`, `v0`, `latest`
-- Generate build provenance attestation
-
-### Pulling Released Images
-
-```bash
-# Pull latest release
-docker pull ghcr.io/ececillo/gotun:latest
-
-# Pull specific version
-docker pull ghcr.io/ececillo/gotun:v0.1.0
-
-# Run
-docker run --rm -p 8080:8080 ghcr.io/ececillo/gotun:latest
-```
-
-## Project Structure
-
-```
-.
-├── cmd/
-│   └── tun/
-│       └── main.go          # Application entry point
-├── .github/
-│   └── workflows/
-│       ├── test.yml         # CI testing workflow
-│       ├── lint.yml         # Linting workflow
-│       ├── format.yml       # Code formatting check workflow
-│       └── release.yml      # Release and publish workflow
-├── Dockerfile               # Multi-stage Docker build
-├── docker-compose.yml       # Compose with watch mode
-├── justfile                 # Task runner recipes
-├── go.mod                   # Go module definition
-├── .gitignore              # Git ignore rules
-└── .dockerignore           # Docker ignore rules
-```
-
-## Configuration
-
-### Environment Variables
-
-The application can be configured via environment variables. Add them to a `.env` file or set them in your shell:
-
-```bash
-# Example .env file
-# Add your configuration here
-```
-
-### Docker Compose Override
-
-For local customization, create a `docker-compose.override.yml`:
-
-```yaml
-services:
-  app:
-    environment:
-      - DEBUG=true
-    volumes:
-      - ./data:/data
-```
+**Note**: The test workflow has been removed as tests cannot run in Linux CI environments (this is macOS-only code).
 
 ## Troubleshooting
 
-### Docker Compose Watch Not Working
+### Permission Denied
 
-Ensure you have Docker Compose v2.22.0 or later:
-
+If you get permission errors, make sure to run with sudo:
 ```bash
-docker compose version
+sudo ./tun
 ```
 
-If watch mode isn't detecting changes, try:
-1. Check that files aren't in the ignore list in `docker-compose.yml`
-2. Restart watch mode: `Ctrl+C` then `just watch`
+### Build Errors on Non-macOS
 
-### Port Already in Use
-
-If port 8080 is already in use, change it in `docker-compose.yml`:
-
-```yaml
-ports:
-  - "3000:8080"  # Use port 3000 instead
-```
-
-### Build Errors
-
-Clean caches and rebuild:
-
-```bash
-just clean
-just build
-```
-
-Or for Docker:
-
-```bash
-docker compose down
-docker system prune -f
-docker compose build --no-cache
-```
+This is expected. The code uses `//go:build darwin` build constraints and will not compile on other platforms.
 
 ## License
 
@@ -304,7 +160,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests (`just test`)
+4. Run tests and linting (`just test && just lint && just fmt`)
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
