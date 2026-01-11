@@ -69,7 +69,9 @@ just
 |---------|-------------|
 | `just build` | Build the binary locally |
 | `just run-sudo` | Build and run with sudo |
-| `just test` | Run tests with race detector and coverage |
+| `just test` | Run unit tests with race detector and coverage |
+| `sudo -E just test-integration` | Run integration tests (requires root) |
+| `just test-all` | Run all tests (unit + integration) |
 | `just fmt` | Format Go code |
 | `just lint` | Run golangci-lint (requires installation) |
 | `just clean` | Remove build artifacts and caches |
