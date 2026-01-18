@@ -85,18 +85,26 @@ func (ic *InterfaceConfigurator) setInterfaceIP(utunInterfaceName string, ipAddr
 
 	// we make the syscall manually since we have no existing method in unix package
 	// to do IOCTL call.
+	//
+	// NOTE: We could use RawSyscall given this StackOverflow explanation:
+	// https://stackoverflow.com/questions/16977988/details-of-syscall-rawsyscall-syscall-syscall-in-go
+	// it would mean that RawSyscall would be a blocking operation which I don't find really
+	// useful for this code.
 	if _, _, errno := unix.Syscall(
 		unix.SYS_IOCTL, //nolint:staticcheck
 		uintptr(ic.fd),
 		command,
 		uintptr(unsafe.Pointer(&ifreq)),
 	); errno != 0 {
-		return fmt.Errorf("unable to set the ip address of our utun interface, error number: %v", errno)
+		err := unix.ErrnoName(errno)
+		return fmt.Errorf("unable to set the ip address of our utun interface, error name: %s (number: %d)", err, errno)
 	}
 
 	return nil
 }
 
+// setInterfaceUP retrieve current interface flags and append UP and RUNNING flags to
+// enable interface.
 func (ic *InterfaceConfigurator) setInterfaceUP(utunInterfaceName string) error {
 	var ifr Ifreq
 	copy(ifr.Name[:], []byte(utunInterfaceName))
