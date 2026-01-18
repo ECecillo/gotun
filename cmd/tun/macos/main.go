@@ -3,6 +3,8 @@
 package main
 
 import (
+	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -13,9 +15,52 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// readLoop just listen on the utun interface and print on the
-// stdout the content of the packages.
-func startReadLoop(utunFD int, interfaceName string) {
+// forwardUDP extracts the UDP payload from an IP packet and forwards it
+// to the specified forwarding address. If forwardAddr is nil, it forwards
+// to the original destination from the packet.
+func forwardUDP(ipPacket []byte, forwardAddr *net.UDPAddr) error {
+	// Get IP header length (IHL is in the lower 4 bits of byte 0, in 32-bit words)
+	ihl := int(ipPacket[0]&0x0F) * 4
+	if len(ipPacket) < ihl+8 {
+		return fmt.Errorf("packet too small for UDP header")
+	}
+
+	// UDP header starts after IP header
+	udpHeader := ipPacket[ihl:]
+
+	// UDP payload starts after 8-byte UDP header
+	udpPayload := udpHeader[8:]
+
+	// Use forward address if provided, otherwise extract from packet
+	dstAddr := forwardAddr
+	if dstAddr == nil {
+		dstIP := net.IPv4(ipPacket[16], ipPacket[17], ipPacket[18], ipPacket[19])
+		dstPort := binary.BigEndian.Uint16(udpHeader[2:4])
+		dstAddr = &net.UDPAddr{
+			IP:   dstIP,
+			Port: int(dstPort),
+		}
+	}
+
+	// Create a UDP connection and send the payload
+	conn, err := net.DialUDP("udp", nil, dstAddr)
+	if err != nil {
+		return fmt.Errorf("failed to dial UDP: %w", err)
+	}
+	defer conn.Close()
+
+	n, err := conn.Write(udpPayload)
+	if err != nil {
+		return fmt.Errorf("failed to write UDP payload: %w", err)
+	}
+
+	log.Printf("📤 Forwarded %d bytes to %s", n, dstAddr)
+	return nil
+}
+
+// startReadLoop listens on the utun interface and prints the content of
+// the packets. UDP packets are forwarded to forwardAddr if specified.
+func startReadLoop(utunFD int, interfaceName string, forwardAddr *net.UDPAddr) {
 	log.Printf("🔍 Starting read loop on %s (fd: %d)", interfaceName, utunFD)
 	log.Printf("📡 Waiting for packets... (try: ping 10.0.0.1)")
 
@@ -69,11 +114,36 @@ func startReadLoop(utunFD int, interfaceName string) {
 			dstIP := net.IPv4(ipPacket[16], ipPacket[17], ipPacket[18], ipPacket[19])
 			fmt.Printf("   Source: %s -> Destination: %s\n", srcIP, dstIP)
 		}
+
+		// Forward UDP packets to their destination
+		if protocol == 17 {
+			if err := forwardUDP(ipPacket, forwardAddr); err != nil {
+				log.Printf("❌ Failed to forward UDP packet: %v", err)
+			}
+		}
 	}
 	log.Printf("🛑 Read loop terminated")
 }
 
 func main() {
+	// Parse command line flags
+	forwardHost := flag.String("forward-host", "", "host to forward UDP packets to (e.g., 127.0.0.1)")
+	forwardPort := flag.Int("forward-port", 8080, "port to forward UDP packets to")
+	flag.Parse()
+
+	// Build forward address if host is specified
+	var forwardAddr *net.UDPAddr
+	if *forwardHost != "" {
+		forwardAddr = &net.UDPAddr{
+			IP:   net.ParseIP(*forwardHost),
+			Port: *forwardPort,
+		}
+		if forwardAddr.IP == nil {
+			log.Fatalf("invalid forward host: %s", *forwardHost)
+		}
+		log.Printf("UDP forwarding enabled to %s", forwardAddr)
+	}
+
 	// Parse IP addresses
 	rawSourceAddr := "10.0.0.2"
 	sourceAddr := net.ParseIP(rawSourceAddr).To4()
@@ -106,6 +176,6 @@ func main() {
 
 	log.Printf("Tunnel created successfully: %s (fd: %d)", tun.Name, tun.FD)
 
-	go startReadLoop(tun.FD, tun.Name)
+	go startReadLoop(tun.FD, tun.Name, forwardAddr)
 	select {}
 }

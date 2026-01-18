@@ -13,6 +13,10 @@ build:
 run-sudo: build
     sudo ./{{binary_name}}
 
+# Run binary with UDP forwarding to localhost (requires sudo)
+run-forward host="127.0.0.1" port="8080": build
+    sudo ./{{binary_name}} -forward-host={{host}} -forward-port={{port}}
+
 # Run unit tests with race detector and coverage
 test:
     go test -v -race -coverprofile=coverage.out ./...
@@ -65,3 +69,19 @@ lint:
 # Run security check (requires gosec)
 security:
     gosec ./...
+
+# Run UDP server (default port 8080, or pass custom port)
+udp-server port="8080":
+    go run ./cmd/server/main.go {{port}}
+
+# Send UDP packet using devtool (default: 10.0.0.1:8080)
+udp-send host="10.0.0.1" port="8080" msg="hello from devtool":
+    go run ./cmd/devtool/main.go -host={{host}} -port={{port}} -msg="{{msg}}"
+
+# -------------------------------
+# Debugging Command Network
+# -------------------------------
+
+# MacOS command to output IPv4 table
+iptable:
+ netstat -nr -f inet

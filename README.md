@@ -77,11 +77,72 @@ just
 | `just clean` | Remove build artifacts and caches |
 | `just security` | Run security checks with gosec |
 
+## Local Testing
+
+This section explains how to test the tunnel locally by sending UDP packets through it.
+
+### Testing Tools
+
+| Command | Description |
+|---------|-------------|
+| `just udp-server` | Start a UDP server on port 8080 |
+| `just udp-server 9000` | Start a UDP server on a custom port |
+| `just run-forward` | Run tunnel with UDP forwarding to localhost:8080 |
+| `just run-forward 127.0.0.1 9000` | Run tunnel with custom forwarding address |
+| `just udp-send` | Send a UDP packet to 10.0.0.1:8080 |
+| `just udp-send 10.0.0.1 8080 "message"` | Send with custom host, port and message |
+
+### Full Workflow (3 Terminals)
+
+**Terminal 1 - Start the UDP server:**
+```bash
+just udp-server
+# UDP server listening on :8080
+```
+
+**Terminal 2 - Start the tunnel with forwarding:**
+```bash
+just run-forward
+# UDP forwarding enabled to 127.0.0.1:8080
+# Tunnel created successfully: utun0 (fd: X)
+# Waiting for packets...
+```
+
+**Terminal 3 - Send a UDP packet through the tunnel:**
+```bash
+just udp-send 10.0.0.1 8080 "hello tunnel"
+# Sent 12 bytes to 10.0.0.1:8080: hello tunnel
+# Received 17 bytes: ACK: hello tunnel
+```
+
+### What Happens
+
+1. The `udp-send` command sends a UDP packet to `10.0.0.1:8080`
+2. The routing table directs packets for `10.0.0.1` through the utun interface
+3. The tunnel intercepts the packet and logs it
+4. The `forwardUDP` function extracts the UDP payload and forwards it to `127.0.0.1:8080`
+5. The UDP server receives the packet and sends back an `ACK` response
+
+### Direct Testing (without tunnel)
+
+To test the UDP server directly without the tunnel:
+```bash
+# Terminal 1
+just udp-server
+
+# Terminal 2
+just udp-send 127.0.0.1 8080 "direct test"
+```
+
 ## Project Structure
 
 ```
 .
 ├── cmd/
+│   ├── devtool/
+│   │   └── main.go              # UDP packet sender for testing
+│   ├── server/
+│   │   └── main.go              # Simple UDP server
 │   └── tun/
 │       └── macos/
 │           └── main.go          # UTUN implementation
