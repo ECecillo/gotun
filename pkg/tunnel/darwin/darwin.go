@@ -56,7 +56,7 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 	log.Printf("UTUN Interface name is: %s", interfaceName)
 
 	// Step 5: Configure the interface with IP addresses
-	configurator, err := NewInterfaceConfigurator()
+	configurator, err := NewNetworkInterfaceConfigurator()
 	if err != nil {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("unable to create interface configurator, err: %w", err)
@@ -65,7 +65,7 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 		_ = configurator.Close()
 	}()
 
-	if err := configurator.ConfigureInterface(interfaceName, config.SourceIP, config.DestinationIP); err != nil {
+	if err := configurator.Configure(interfaceName, config.SourceIP, config.DestinationIP); err != nil {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("unable to configure utun ip interface, err: %w", err)
 	}

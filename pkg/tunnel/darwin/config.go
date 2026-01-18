@@ -17,32 +17,32 @@ type Ifreq struct {
 	Data [16]byte
 }
 
-// InterfaceConfigurator handles network interface configuration operations.
-type InterfaceConfigurator struct {
+// NetworkInterfaceConfigurator handles network interface configuration operations.
+type NetworkInterfaceConfigurator struct {
 	fd int
 }
 
-// NewInterfaceConfigurator creates a new interface configurator with a network manager socket.
-func NewInterfaceConfigurator() (*InterfaceConfigurator, error) {
+// NewNetworkInterfaceConfigurator creates a new interface configurator with a network manager socket.
+func NewNetworkInterfaceConfigurator() (*NetworkInterfaceConfigurator, error) {
 	fd, err := OpenKernelNetworkManagerSocket()
 	if err != nil {
 		return nil, fmt.Errorf("unable to open a socket to our kernel network manager, err: %w", err)
 	}
-	return &InterfaceConfigurator{fd: fd}, nil
+	return &NetworkInterfaceConfigurator{fd: fd}, nil
 }
 
 // Close closes the network manager socket.
-func (ic *InterfaceConfigurator) Close() error {
+func (ic *NetworkInterfaceConfigurator) Close() error {
 	if err := unix.Close(ic.fd); err != nil {
 		return fmt.Errorf("unable to close the socket to our kernel network manager, err: %w", err)
 	}
 	return nil
 }
 
-// ConfigureInterface is the code equivalent of the following ifconfig command:
+// Configure is the code equivalent of the following ifconfig command:
 //
 // ifconfig utun_interface_name 10.0.0.2 10.0.0.1 up
-func (ic *InterfaceConfigurator) ConfigureInterface(utunInterfaceName string, sourceIP, destinationIP net.IP) error {
+func (ic *NetworkInterfaceConfigurator) Configure(utunInterfaceName string, sourceIP, destinationIP net.IP) error {
 	if err := ic.setSourceAddr(utunInterfaceName, sourceIP); err != nil {
 		return fmt.Errorf("unable to set utun IPv4 source address interface, err: %w", err)
 	}
@@ -59,15 +59,15 @@ func (ic *InterfaceConfigurator) ConfigureInterface(utunInterfaceName string, so
 	return nil
 }
 
-func (ic *InterfaceConfigurator) setSourceAddr(utunInterfaceName string, sourceIP net.IP) error {
+func (ic *NetworkInterfaceConfigurator) setSourceAddr(utunInterfaceName string, sourceIP net.IP) error {
 	return ic.setInterfaceIP(utunInterfaceName, sourceIP, unix.SIOCSIFADDR) //nolint:staticcheck
 }
 
-func (ic *InterfaceConfigurator) setDestinationAddr(utunInterfaceName string, destinationIP net.IP) error {
+func (ic *NetworkInterfaceConfigurator) setDestinationAddr(utunInterfaceName string, destinationIP net.IP) error {
 	return ic.setInterfaceIP(utunInterfaceName, destinationIP, unix.SIOCSIFDSTADDR) //nolint:staticcheck
 }
 
-func (ic *InterfaceConfigurator) setInterfaceIP(utunInterfaceName string, ipAddr net.IP, command uintptr) error {
+func (ic *NetworkInterfaceConfigurator) setInterfaceIP(utunInterfaceName string, ipAddr net.IP, command uintptr) error {
 	var ifreq Ifreq
 	copy(ifreq.Name[:], []byte(utunInterfaceName))
 
@@ -105,7 +105,7 @@ func (ic *InterfaceConfigurator) setInterfaceIP(utunInterfaceName string, ipAddr
 
 // setInterfaceUP retrieve current interface flags and append UP and RUNNING flags to
 // enable interface.
-func (ic *InterfaceConfigurator) setInterfaceUP(utunInterfaceName string) error {
+func (ic *NetworkInterfaceConfigurator) setInterfaceUP(utunInterfaceName string) error {
 	var ifr Ifreq
 	copy(ifr.Name[:], []byte(utunInterfaceName))
 
