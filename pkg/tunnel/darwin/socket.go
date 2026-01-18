@@ -49,3 +49,17 @@ func OpenKernelNetworkManagerSocket() (int, error) {
 	log.Println("network manager socket established!")
 	return fd, nil
 }
+
+// OpenRoutingSocket create and return the id of the file descriptor
+// opened to the ip router that hanle all routing table, ...
+//
+// The caller is responsible of closing the socket by calling unix.Close(fd) and
+// handle any error.
+func OpenRoutingSocket() (int, error) {
+	fd, err := unix.Socket(unix.AF_ROUTE, unix.SOCK_RAW, 0)
+	if err != nil {
+		return 0, fmt.Errorf("unable to open a socket to our ip router, err: %w", err)
+	}
+	log.Println("ip router socket established!")
+	return fd, nil
+}
