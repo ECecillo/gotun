@@ -106,12 +106,6 @@ func main() {
 
 	log.Printf("Tunnel created successfully: %s (fd: %d)", tun.Name, tun.FD)
 
-	// Add routing information
-	log.Printf("")
-	log.Printf("⚠️  IMPORTANT: To route traffic through the tunnel, run:")
-	log.Printf("   sudo route add -host 10.0.0.1 -interface %s", tun.Name)
-	log.Printf("")
-
 	go startReadLoop(tun.FD, tun.Name)
 	select {}
 }
