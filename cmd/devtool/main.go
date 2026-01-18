@@ -1,22 +1,29 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
-func main() {
-	host := flag.String("host", "10.0.0.1", "destination host")
-	port := flag.Int("port", 8080, "destination port")
-	message := flag.String("msg", "hello from devtool", "message to send")
-	timeout := flag.Duration("timeout", 2*time.Second, "response timeout")
-	flag.Parse()
+type config struct {
+	Host    string        `env:"DEVTOOL_HOST" envDefault:"10.0.0.1"`
+	Port    int           `env:"DEVTOOL_PORT" envDefault:"8080"`
+	Message string        `env:"DEVTOOL_MSG" envDefault:"hello from devtool"`
+	Timeout time.Duration `env:"DEVTOOL_TIMEOUT" envDefault:"2s"`
+}
 
-	addr := net.JoinHostPort(*host, strconv.Itoa(*port))
+func main() {
+	cfg, err := env.ParseAs[config]()
+	if err != nil {
+		log.Fatalf("failed to parse config: %v", err)
+	}
+
+	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		log.Fatalf("Failed to dial UDP %s: %v", addr, err)
@@ -25,14 +32,14 @@ func main() {
 		_ = conn.Close()
 	}()
 
-	n, err := conn.Write([]byte(*message))
+	n, err := conn.Write([]byte(cfg.Message))
 	if err != nil {
 		log.Fatalf("Failed to send UDP packet: %v", err)
 	}
-	fmt.Printf("Sent %d bytes to %s: %s\n", n, addr, *message)
+	fmt.Printf("Sent %d bytes to %s: %s\n", n, addr, cfg.Message)
 
 	// Wait for response
-	if err := conn.SetReadDeadline(time.Now().Add(*timeout)); err != nil {
+	if err := conn.SetReadDeadline(time.Now().Add(cfg.Timeout)); err != nil {
 		log.Fatalf("unable to set connection deadline, err: %v", err)
 	}
 

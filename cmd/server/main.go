@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
+
+	"github.com/caarlos0/env/v11"
 )
 
+type config struct {
+	Port int `env:"SERVER_PORT" envDefault:"8080"`
+}
+
 func main() {
-	port := ":8080"
-	if len(os.Args) > 1 {
-		port = ":" + os.Args[1]
+	cfg, err := env.ParseAs[config]()
+	if err != nil {
+		log.Fatalf("failed to parse config: %v", err)
 	}
 
+	port := fmt.Sprintf(":%d", cfg.Port)
 	addr, err := net.ResolveUDPAddr("udp", port)
 	if err != nil {
 		log.Fatalf("Failed to resolve UDP address: %v", err)

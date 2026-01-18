@@ -13,9 +13,13 @@ build:
 run-sudo: build
     sudo ./{{binary_name}}
 
-# Run binary with UDP forwarding to localhost (requires sudo)
-run-forward host="127.0.0.1" port="8080": build
-    sudo ./{{binary_name}} -forward-host={{host}} -forward-port={{port}}
+# Run binary with UDP forwarding using .env.tunnel (requires sudo)
+run-forward: build
+    #!/usr/bin/env bash
+    set -a
+    source .env.tunnel
+    set +a
+    sudo -E ./{{binary_name}}
 
 # Run unit tests with race detector and coverage
 test:
@@ -70,13 +74,21 @@ lint:
 security:
     gosec ./...
 
-# Run UDP server (default port 8080, or pass custom port)
-udp-server port="8080":
-    go run ./cmd/server/main.go {{port}}
+# Run UDP server using .env.server
+udp-server:
+    #!/usr/bin/env bash
+    set -a
+    source .env.server
+    set +a
+    go run ./cmd/server/main.go
 
-# Send UDP packet using devtool (default: 10.0.0.1:8080)
-udp-send host="10.0.0.1" port="8080" msg="hello from devtool":
-    go run ./cmd/devtool/main.go -host={{host}} -port={{port}} -msg="{{msg}}"
+# Send UDP packet using .env.devtool
+udp-send:
+    #!/usr/bin/env bash
+    set -a
+    source .env.devtool
+    set +a
+    go run ./cmd/devtool/main.go
 
 # -------------------------------
 # Debugging Command Network

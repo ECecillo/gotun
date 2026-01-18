@@ -77,6 +77,54 @@ just
 | `just clean` | Remove build artifacts and caches |
 | `just security` | Run security checks with gosec |
 
+## Configuration
+
+All commands are configured via environment variables using the [env](https://github.com/caarlos0/env) package. Each command has its own `.env` file:
+
+| File | Command | Description |
+|------|---------|-------------|
+| `.env.tunnel` | `just run-forward` | Tunnel configuration |
+| `.env.server` | `just udp-server` | UDP server configuration |
+| `.env.devtool` | `just udp-send` | Devtool configuration |
+
+### Setup
+
+Copy the example file and create your env files:
+```bash
+# View the example with all available variables
+cat .env.example
+
+# Create env files (already provided with defaults)
+# Edit as needed:
+# - .env.tunnel
+# - .env.server
+# - .env.devtool
+```
+
+### Tunnel Configuration (`.env.tunnel`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TUN_SOURCE_IP` | Source IP for the tunnel interface | `10.0.0.2` |
+| `TUN_DEST_IP` | Destination IP for the tunnel interface | `10.0.0.1` |
+| `TUN_FORWARD_HOST` | Host to forward UDP packets to | `127.0.0.1` |
+| `TUN_FORWARD_PORT` | Port to forward UDP packets to | `8080` |
+
+### UDP Server Configuration (`.env.server`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_PORT` | Port to listen on | `8080` |
+
+### Devtool Configuration (`.env.devtool`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEVTOOL_HOST` | Destination host for UDP packets | `10.0.0.1` |
+| `DEVTOOL_PORT` | Destination port for UDP packets | `8080` |
+| `DEVTOOL_MSG` | Message to send | `hello from devtool` |
+| `DEVTOOL_TIMEOUT` | Response timeout | `2s` |
+
 ## Local Testing
 
 This section explains how to test the tunnel locally by sending UDP packets through it.
@@ -85,12 +133,9 @@ This section explains how to test the tunnel locally by sending UDP packets thro
 
 | Command | Description |
 |---------|-------------|
-| `just udp-server` | Start a UDP server on port 8080 |
-| `just udp-server 9000` | Start a UDP server on a custom port |
-| `just run-forward` | Run tunnel with UDP forwarding to localhost:8080 |
-| `just run-forward 127.0.0.1 9000` | Run tunnel with custom forwarding address |
-| `just udp-send` | Send a UDP packet to 10.0.0.1:8080 |
-| `just udp-send 10.0.0.1 8080 "message"` | Send with custom host, port and message |
+| `just udp-server` | Start UDP server (config: `.env.server`) |
+| `just run-forward` | Run tunnel with forwarding (config: `.env.tunnel`) |
+| `just udp-send` | Send UDP packet (config: `.env.devtool`) |
 
 ### Full Workflow (3 Terminals)
 
@@ -110,9 +155,14 @@ just run-forward
 
 **Terminal 3 - Send a UDP packet through the tunnel:**
 ```bash
-just udp-send 10.0.0.1 8080 "hello tunnel"
-# Sent 12 bytes to 10.0.0.1:8080: hello tunnel
-# Received 17 bytes: ACK: hello tunnel
+just udp-send
+# Sent 18 bytes to 10.0.0.1:8080: hello from devtool
+# Received 23 bytes: ACK: hello from devtool
+```
+
+To customize the message, edit `.env.devtool`:
+```bash
+DEVTOOL_MSG=hello tunnel
 ```
 
 ### What Happens
@@ -125,13 +175,18 @@ just udp-send 10.0.0.1 8080 "hello tunnel"
 
 ### Direct Testing (without tunnel)
 
-To test the UDP server directly without the tunnel:
+To test the UDP server directly without the tunnel, edit `.env.devtool`:
+```bash
+DEVTOOL_HOST=127.0.0.1
+```
+
+Then run:
 ```bash
 # Terminal 1
 just udp-server
 
 # Terminal 2
-just udp-send 127.0.0.1 8080 "direct test"
+just udp-send
 ```
 
 ## Project Structure

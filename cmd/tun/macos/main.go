@@ -4,7 +4,6 @@ package main
 
 import (
 	"encoding/binary"
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -12,8 +11,16 @@ import (
 	"ececillo/gotun/pkg/tunnel"
 	"ececillo/gotun/pkg/tunnel/darwin"
 
+	"github.com/caarlos0/env/v11"
 	"golang.org/x/sys/unix"
 )
+
+type config struct {
+	SourceIP    string `env:"TUN_SOURCE_IP" envDefault:"10.0.0.2"`
+	DestIP      string `env:"TUN_DEST_IP" envDefault:"10.0.0.1"`
+	ForwardHost string `env:"TUN_FORWARD_HOST"`
+	ForwardPort int    `env:"TUN_FORWARD_PORT" envDefault:"8080"`
+}
 
 // forwardUDP extracts the UDP payload from an IP packet and forwards it
 // to the specified forwarding address. If forwardAddr is nil, it forwards
@@ -126,35 +133,34 @@ func startReadLoop(utunFD int, interfaceName string, forwardAddr *net.UDPAddr) {
 }
 
 func main() {
-	// Parse command line flags
-	forwardHost := flag.String("forward-host", "", "host to forward UDP packets to (e.g., 127.0.0.1)")
-	forwardPort := flag.Int("forward-port", 8080, "port to forward UDP packets to")
-	flag.Parse()
+	// Parse environment variables
+	cfg, err := env.ParseAs[config]()
+	if err != nil {
+		log.Fatalf("failed to parse config: %v", err)
+	}
 
 	// Build forward address if host is specified
 	var forwardAddr *net.UDPAddr
-	if *forwardHost != "" {
+	if cfg.ForwardHost != "" {
 		forwardAddr = &net.UDPAddr{
-			IP:   net.ParseIP(*forwardHost),
-			Port: *forwardPort,
+			IP:   net.ParseIP(cfg.ForwardHost),
+			Port: cfg.ForwardPort,
 		}
 		if forwardAddr.IP == nil {
-			log.Fatalf("invalid forward host: %s", *forwardHost)
+			log.Fatalf("invalid forward host: %s", cfg.ForwardHost)
 		}
 		log.Printf("UDP forwarding enabled to %s", forwardAddr)
 	}
 
 	// Parse IP addresses
-	rawSourceAddr := "10.0.0.2"
-	sourceAddr := net.ParseIP(rawSourceAddr).To4()
+	sourceAddr := net.ParseIP(cfg.SourceIP).To4()
 	if sourceAddr == nil {
-		log.Fatalf("invalid ipv4 address parsed, addr: %s", rawSourceAddr)
+		log.Fatalf("invalid ipv4 address parsed, addr: %s", cfg.SourceIP)
 	}
 
-	rawDestinationAddr := "10.0.0.1"
-	destinationAddr := net.ParseIP(rawDestinationAddr).To4()
+	destinationAddr := net.ParseIP(cfg.DestIP).To4()
 	if destinationAddr == nil {
-		log.Fatalf("invalid ipv4 address parsed, addr: %s", rawDestinationAddr)
+		log.Fatalf("invalid ipv4 address parsed, addr: %s", cfg.DestIP)
 	}
 
 	// Create tunnel provider
