@@ -13,13 +13,6 @@ A macOS userspace tunnel (UTUN) implementation in Go that creates and configures
 - [Just](https://github.com/casey/just#installation) command runner (optional but recommended)
 - Root/sudo privileges (required for kernel network operations)
 
-### Installing Just
-
-```bash
-# macOS
-brew install just
-```
-
 ## Quick Start
 
 ### Build and Run
