@@ -82,8 +82,8 @@ udp-server:
     set +a
     go run ./cmd/server/main.go
 
-# Send UDP packet using .env.devtool
-udp-send:
+# Send UDP/TCP request using .env.devtool
+devtool-send:
     #!/usr/bin/env bash
     set -a
     source .env.devtool

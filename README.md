@@ -32,6 +32,7 @@ sudo ./tun
 ## What This Does
 
 The program:
+
 1. Opens a kernel control socket to communicate with the macOS kernel
 2. Retrieves the UTUN (User Tunnel) controller ID via IOCTL calls
 3. Connects to the UTUN controller
@@ -42,6 +43,7 @@ The program:
 6. Brings the interface UP and marks it as RUNNING
 
 This is equivalent to running:
+
 ```bash
 ifconfig utun0 10.0.0.2 10.0.0.1 up
 ```
@@ -78,11 +80,12 @@ All commands are configured via environment variables using the [env](https://gi
 |------|---------|---------|
 | `.env.tunnel` | `just run-forward` | `.env.tunnel.example` |
 | `.env.server` | `just udp-server` | `.env.server.example` |
-| `.env.devtool` | `just udp-send` | `.env.devtool.example` |
+| `.env.devtool` | `just devtool-send` | `.env.devtool.example` |
 
 ### Setup
 
 Copy the example files to create your env files:
+
 ```bash
 cp .env.tunnel.example .env.tunnel
 cp .env.server.example .env.server
@@ -96,7 +99,7 @@ See the `.env.*.example` files for available variables and their descriptions.
 
 ## Local Testing
 
-This section explains how to test the tunnel locally by sending UDP packets through it.
+This section explains how to test the tunnel locally by sending UDP or TCP requests through it.
 
 ### Testing Tools
 
@@ -104,17 +107,19 @@ This section explains how to test the tunnel locally by sending UDP packets thro
 |---------|-------------|
 | `just udp-server` | Start UDP server (config: `.env.server`) |
 | `just run-forward` | Run tunnel with forwarding (config: `.env.tunnel`) |
-| `just udp-send` | Send UDP packet (config: `.env.devtool`) |
+| `just devtool-send` | Send UDP/TCP request (config: `.env.devtool`) |
 
 ### Full Workflow (3 Terminals)
 
 **Terminal 1 - Start the UDP server:**
+
 ```bash
 just udp-server
 # UDP server listening on :8080
 ```
 
 **Terminal 2 - Start the tunnel with forwarding:**
+
 ```bash
 just run-forward
 # UDP forwarding enabled to 127.0.0.1:8080
@@ -122,32 +127,37 @@ just run-forward
 # Waiting for packets...
 ```
 
-**Terminal 3 - Send a UDP packet through the tunnel:**
+**Terminal 3 - Send a UDP request through the tunnel:**
+
 ```bash
-just udp-send
+just devtool-send
 # Sent 18 bytes to 10.0.0.1:8080: hello from devtool
 # Received 23 bytes: ACK: hello from devtool
 ```
 
 To customize the message, edit `.env.devtool`:
+
 ```bash
 DEVTOOL_MSG=hello tunnel
+DEVTOOL_PROTOCOL=udp # tcp
 ```
 
 ### Direct Testing (without tunnel)
 
 To test the UDP server directly without the tunnel, edit `.env.devtool`:
+
 ```bash
 DEVTOOL_HOST=127.0.0.1
 ```
 
 Then run:
+
 ```bash
 # Terminal 1
 just udp-server
 
 # Terminal 2
-just udp-send
+just devtool-send
 ```
 
 ## Project Structure
@@ -156,7 +166,7 @@ just udp-send
 .
 ├── cmd/
 │   ├── devtool/
-│   │   └── main.go              # UDP packet sender for testing
+│   │   └── main.go              # UDP/TCP request sender for testing
 │   ├── server/
 │   │   └── main.go              # Simple UDP server
 │   └── tun/
@@ -192,6 +202,7 @@ The program uses macOS kernel control sockets to communicate directly with the k
 ## Security Considerations
 
 This program requires root privileges because it:
+
 - Creates kernel control sockets
 - Modifies network interfaces
 - Performs low-level kernel operations
@@ -205,6 +216,7 @@ The project includes GitHub Actions workflows for automated code quality checks:
 ### Lint Workflow
 
 Runs on every push to `main` and all pull requests:
+
 - Executes golangci-lint with 5-minute timeout
 - Checks for code quality issues and best practices
 - Fails build if any linting issues are found
@@ -212,6 +224,7 @@ Runs on every push to `main` and all pull requests:
 ### Format Workflow
 
 Runs on every push to `main` and all pull requests:
+
 - Checks code formatting with gofmt
 - Ensures all Go files follow standard formatting
 - Fails build if any files are not properly formatted
@@ -223,6 +236,7 @@ Runs on every push to `main` and all pull requests:
 ### Permission Denied
 
 If you get permission errors, make sure to run with sudo:
+
 ```bash
 sudo ./tun
 ```
