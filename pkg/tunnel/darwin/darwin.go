@@ -72,6 +72,21 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 
 	log.Println("successfully enabled UTUN network interface")
 
+	// 6. Add UTUN DestinationIP to Router IP Table so we know
+	// from which interface we can send data to this IP address.
+	ipRouterConfigurator, err := NewIPRouterConfigurator()
+	if err != nil {
+		_ = unix.Close(fd)
+		return nil, fmt.Errorf("unable to create ip router configurator, err: %w", err)
+	}
+	defer func() {
+		_ = ipRouterConfigurator.Close()
+	}()
+
+	if err := ipRouterConfigurator.Configure(interfaceName, config.DestinationIP); err != nil {
+		return nil, fmt.Errorf("unable to configure ip router, err: %w", err)
+	}
+
 	return &tunnel.Tunnel{
 		Name: interfaceName,
 		FD:   fd,
