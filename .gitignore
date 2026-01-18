@@ -8,8 +8,11 @@
 *.so
 *.dylib
 
-# Project binary
+# Project binaries
 /tun
+/macos
+/server
+/devtool
 
 # Test binary, built with `go test -c`
 *.test
