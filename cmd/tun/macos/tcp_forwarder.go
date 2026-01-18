@@ -144,7 +144,7 @@ func (f *TCPForwarder) Close() error {
 	for _, conn := range f.connections {
 		conn.cancel()
 		if conn.serverConn != nil {
-			conn.serverConn.Close()
+			_ = conn.serverConn.Close()
 		}
 	}
 	f.connections = make(map[connectionKey]*tcpConnection)
@@ -157,7 +157,7 @@ func (f *TCPForwarder) handleSYN(key connectionKey, info *tcpPacketInfo) error {
 	log.Printf("📨 TCP SYN: Initiating connection to %s:%d", info.DstIP, info.DstPort)
 
 	// Connect to the real server
-	serverAddr := fmt.Sprintf("%s:%d", info.DstIP, info.DstPort)
+	serverAddr := net.JoinHostPort(info.DstIP.String(), fmt.Sprintf("%d", info.DstPort))
 	serverConn, err := net.DialTimeout("tcp", serverAddr, 10*time.Second)
 	if err != nil {
 		log.Printf("❌ TCP: Failed to connect to %s: %v", serverAddr, err)
@@ -181,7 +181,7 @@ func (f *TCPForwarder) handleSYN(key connectionKey, info *tcpPacketInfo) error {
 	if existing, ok := f.connections[key]; ok {
 		existing.cancel()
 		if existing.serverConn != nil {
-			existing.serverConn.Close()
+			_ = existing.serverConn.Close()
 		}
 	}
 	f.connections[key] = conn
@@ -247,7 +247,7 @@ func (f *TCPForwarder) handleFIN(conn *tcpConnection, info *tcpPacketInfo) error
 
 	// Close server connection
 	if conn.serverConn != nil {
-		conn.serverConn.Close()
+		_ = conn.serverConn.Close()
 	}
 
 	// Send FIN-ACK to client
@@ -405,7 +405,7 @@ func (f *TCPForwarder) sendFINToClient(conn *tcpConnection) error {
 // startServerReader reads from the server and sends data to client.
 func (f *TCPForwarder) startServerReader(conn *tcpConnection) {
 	defer func() {
-		f.sendFINToClient(conn)
+		_ = f.sendFINToClient(conn)
 		f.removeConnection(conn.key)
 	}()
 
@@ -418,7 +418,7 @@ func (f *TCPForwarder) startServerReader(conn *tcpConnection) {
 		}
 
 		// Set read deadline to allow periodic context checks
-		conn.serverConn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		_ = conn.serverConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 		n, err := conn.serverConn.Read(buf)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -469,7 +469,7 @@ func (f *TCPForwarder) cleanupIdleConnections() {
 			log.Printf("🧹 TCP: Cleaning up idle connection (idle: %v)", idle)
 			conn.cancel()
 			if conn.serverConn != nil {
-				conn.serverConn.Close()
+				_ = conn.serverConn.Close()
 			}
 			delete(f.connections, key)
 		}
@@ -484,7 +484,7 @@ func (f *TCPForwarder) removeConnection(key connectionKey) {
 	if conn, ok := f.connections[key]; ok {
 		conn.cancel()
 		if conn.serverConn != nil {
-			conn.serverConn.Close()
+			_ = conn.serverConn.Close()
 		}
 		delete(f.connections, key)
 		log.Printf("🗑️  TCP: Connection removed")

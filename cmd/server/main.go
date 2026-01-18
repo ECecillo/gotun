@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to listen on UDP port %s: %v", port, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	fmt.Printf("UDP server listening on %s\n", port)
 

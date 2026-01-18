@@ -66,5 +66,5 @@ func main() {
 
 	<-sigChan
 	log.Printf("🛑 Shutting down...")
-	reader.Close()
+	_ = reader.Close()
 }

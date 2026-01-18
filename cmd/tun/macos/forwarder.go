@@ -103,7 +103,7 @@ func (f *UDPForwarder) forwardAndGetResponse(info *udpPacketInfo) ([]byte, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial UDP: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	n, err := conn.Write(info.Payload)
 	if err != nil {
