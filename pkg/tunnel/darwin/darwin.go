@@ -23,7 +23,7 @@ func NewProvider() *Provider {
 
 // Create creates and configures a UTUN network interface.
 func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
-	// Step 1: Open kernel control socket in order to send IOCTL call
+	// 1. Open kernel control socket in order to send IOCTL call
 	fd, err := OpenKernelControlSocket()
 	if err != nil {
 		return nil, fmt.Errorf("unable to open kernel control socket, err: %w", err)
@@ -31,7 +31,7 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 	// Set the provider file descriptor for further processing.
 	p.fd = fd
 
-	// Step 2: Retrieve UTUN controller info
+	// 2. Retrieve UTUN controller info
 	info, err := RetrieveUTUNControllerID(fd)
 	if err != nil {
 		_ = unix.Close(fd)
@@ -39,7 +39,7 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 	}
 	log.Println("successfully retrieved CTLInfo from kernel controller")
 
-	// Step 3: Connect to UTUN controller
+	// 3. Connect to UTUN controller
 	if err := ConnectToUTUNController(fd, info); err != nil {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("unable to connect to UTUN Controller, err: %w", err)
@@ -47,7 +47,7 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 	log.Println("successfully connected to UTUN Controller")
 	log.Println("file descriptor now set to UTUN Controller for further syscall")
 
-	// Step 4: Get the interface name in order to configure its IP interface
+	// 4. Get the interface name in order to configure its IP interface
 	interfaceName, err := GetUTUNInterfaceName(fd)
 	if err != nil {
 		_ = unix.Close(fd)
@@ -55,17 +55,17 @@ func (p *Provider) Create(config tunnel.TunnelConfig) (*tunnel.Tunnel, error) {
 	}
 	log.Printf("UTUN Interface name is: %s", interfaceName)
 
-	// Step 5: Configure the interface with IP addresses
-	configurator, err := NewNetworkInterfaceConfigurator()
+	// 5. Configure the interface with IP addresses
+	networkInterfaceConfigurator, err := NewNetworkInterfaceConfigurator()
 	if err != nil {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("unable to create interface configurator, err: %w", err)
 	}
 	defer func() {
-		_ = configurator.Close()
+		_ = networkInterfaceConfigurator.Close()
 	}()
 
-	if err := configurator.Configure(interfaceName, config.SourceIP, config.DestinationIP); err != nil {
+	if err := networkInterfaceConfigurator.Configure(interfaceName, config.SourceIP, config.DestinationIP); err != nil {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("unable to configure utun ip interface, err: %w", err)
 	}
