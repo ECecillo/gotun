@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"ececillo/gotun/pkg/tunnel"
 	"ececillo/gotun/pkg/tunnel/darwin"
@@ -15,52 +16,114 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// forwardUDP extracts the UDP payload from an IP packet and forwards it
-// to the specified forwarding address. If forwardAddr is nil, it forwards
-// to the original destination from the packet.
-func forwardUDP(ipPacket []byte, forwardAddr *net.UDPAddr) error {
+// udpPacketInfo contains extracted information from a UDP packet.
+type udpPacketInfo struct {
+	SrcIP   net.IP
+	DstIP   net.IP
+	SrcPort uint16
+	DstPort uint16
+	Payload []byte
+}
+
+// parseUDPPacket extracts UDP packet information from an IP packet.
+func parseUDPPacket(ipPacket []byte) (*udpPacketInfo, error) {
 	// Get IP header length (IHL is in the lower 4 bits of byte 0, in 32-bit words)
 	ihl := int(ipPacket[0]&0x0F) * 4
 	if len(ipPacket) < ihl+8 {
-		return fmt.Errorf("packet too small for UDP header")
+		return nil, fmt.Errorf("packet too small for UDP header")
 	}
+
+	// Extract IPs from IP header
+	srcIP := net.IPv4(ipPacket[12], ipPacket[13], ipPacket[14], ipPacket[15])
+	dstIP := net.IPv4(ipPacket[16], ipPacket[17], ipPacket[18], ipPacket[19])
 
 	// UDP header starts after IP header
 	udpHeader := ipPacket[ihl:]
+	srcPort := binary.BigEndian.Uint16(udpHeader[0:2])
+	dstPort := binary.BigEndian.Uint16(udpHeader[2:4])
 
 	// UDP payload starts after 8-byte UDP header
-	udpPayload := udpHeader[8:]
+	payload := udpHeader[8:]
 
-	// Use forward address if provided, otherwise extract from packet
+	return &udpPacketInfo{
+		SrcIP:   srcIP,
+		DstIP:   dstIP,
+		SrcPort: srcPort,
+		DstPort: dstPort,
+		Payload: payload,
+	}, nil
+}
+
+// forwardUDPAndGetResponse forwards a UDP packet and waits for a response.
+// It returns the response payload or an error.
+func forwardUDPAndGetResponse(info *udpPacketInfo, forwardAddr *net.UDPAddr, timeout time.Duration) ([]byte, error) {
+	// Use forward address if provided, otherwise use packet destination
 	dstAddr := forwardAddr
 	if dstAddr == nil {
-		dstIP := net.IPv4(ipPacket[16], ipPacket[17], ipPacket[18], ipPacket[19])
-		dstPort := binary.BigEndian.Uint16(udpHeader[2:4])
 		dstAddr = &net.UDPAddr{
-			IP:   dstIP,
-			Port: int(dstPort),
+			IP:   info.DstIP,
+			Port: int(info.DstPort),
 		}
 	}
 
 	// Create a UDP connection and send the payload
 	conn, err := net.DialUDP("udp", nil, dstAddr)
 	if err != nil {
-		return fmt.Errorf("failed to dial UDP: %w", err)
+		return nil, fmt.Errorf("failed to dial UDP: %w", err)
 	}
 	defer conn.Close()
 
-	n, err := conn.Write(udpPayload)
+	n, err := conn.Write(info.Payload)
 	if err != nil {
-		return fmt.Errorf("failed to write UDP payload: %w", err)
+		return nil, fmt.Errorf("failed to write UDP payload: %w", err)
+	}
+	log.Printf("📤 Forwarded %d bytes to %s", n, dstAddr)
+
+	// Set read deadline for response
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, fmt.Errorf("failed to set read deadline: %w", err)
 	}
 
-	log.Printf("📤 Forwarded %d bytes to %s", n, dstAddr)
+	// Read response
+	respBuffer := make([]byte, 2000)
+	n, err = conn.Read(respBuffer)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			log.Printf("⏱️  No response received (timeout)")
+			return nil, nil // No response, not an error
+		}
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	log.Printf("📥 Received response: %d bytes", n)
+	return respBuffer[:n], nil
+}
+
+// writeResponseToTun constructs a response IP packet and writes it to the utun interface.
+func writeResponseToTun(utunFD int, originalInfo *udpPacketInfo, responsePayload []byte) error {
+	// Build response packet with swapped addresses
+	// Response: src becomes dst, dst becomes src
+	packet := buildIPv4UDPPacket(
+		originalInfo.DstIP,   // Response source = original destination
+		originalInfo.SrcIP,   // Response destination = original source
+		originalInfo.DstPort, // Response source port = original destination port
+		originalInfo.SrcPort, // Response destination port = original source port
+		responsePayload,
+	)
+
+	n, err := unix.Write(utunFD, packet)
+	if err != nil {
+		return fmt.Errorf("failed to write to utun: %w", err)
+	}
+
+	log.Printf("📨 Wrote %d bytes response to utun (payload: %d bytes)", n, len(responsePayload))
 	return nil
 }
 
 // startReadLoop listens on the utun interface and prints the content of
 // the packets. UDP packets are forwarded to forwardAddr if specified.
-func startReadLoop(utunFD int, interfaceName string, forwardAddr *net.UDPAddr) {
+// Responses are written back to the utun interface.
+func startReadLoop(utunFD int, interfaceName string, forwardAddr *net.UDPAddr, responseTimeout time.Duration) {
 	log.Printf("🔍 Starting read loop on %s (fd: %d)", interfaceName, utunFD)
 	log.Printf("📡 Waiting for packets... (try: ping 10.0.0.1)")
 
@@ -115,10 +178,26 @@ func startReadLoop(utunFD int, interfaceName string, forwardAddr *net.UDPAddr) {
 			fmt.Printf("   Source: %s -> Destination: %s\n", srcIP, dstIP)
 		}
 
-		// Forward UDP packets to their destination
+		// Forward UDP packets and handle responses
 		if protocol == 17 {
-			if err := forwardUDP(ipPacket, forwardAddr); err != nil {
+			info, err := parseUDPPacket(ipPacket)
+			if err != nil {
+				log.Printf("❌ Failed to parse UDP packet: %v", err)
+				continue
+			}
+
+			// Forward and get response
+			response, err := forwardUDPAndGetResponse(info, forwardAddr, responseTimeout)
+			if err != nil {
 				log.Printf("❌ Failed to forward UDP packet: %v", err)
+				continue
+			}
+
+			// Write response back to utun if we got one
+			if response != nil {
+				if err := writeResponseToTun(utunFD, info, response); err != nil {
+					log.Printf("❌ Failed to write response to utun: %v", err)
+				}
 			}
 		}
 	}
@@ -174,7 +253,8 @@ func main() {
 	}
 
 	log.Printf("Tunnel created successfully: %s (fd: %d)", tun.Name, tun.FD)
+	log.Printf("Response timeout: %s", cfg.ResponseTimeout)
 
-	go startReadLoop(tun.FD, tun.Name, forwardAddr)
+	go startReadLoop(tun.FD, tun.Name, forwardAddr, cfg.ResponseTimeout)
 	select {}
 }
