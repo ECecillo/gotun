@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	ipv4Version    = 4
-	ipv4HeaderLen  = 20
-	udpHeaderLen   = 8
+	ipv4Version     = 4
+	ipv4HeaderLen   = 20
+	udpHeaderLen    = 8
 	ipv4ProtocolUDP = 17
-	defaultTTL     = 64
+	defaultTTL      = 64
 )
 
 // buildIPv4UDPPacket constructs a complete IPv4+UDP packet with the given parameters.
