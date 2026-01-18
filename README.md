@@ -81,11 +81,11 @@ just
 
 All commands are configured via environment variables using the [env](https://github.com/caarlos0/env) package. Each command has its own `.env` file:
 
-| File | Command | Description |
-|------|---------|-------------|
-| `.env.tunnel` | `just run-forward` | Tunnel configuration |
-| `.env.server` | `just udp-server` | UDP server configuration |
-| `.env.devtool` | `just udp-send` | Devtool configuration |
+| File | Command | Example |
+|------|---------|---------|
+| `.env.tunnel` | `just run-forward` | `.env.tunnel.example` |
+| `.env.server` | `just udp-server` | `.env.server.example` |
+| `.env.devtool` | `just udp-send` | `.env.devtool.example` |
 
 ### Setup
 
@@ -99,29 +99,7 @@ cp .env.devtool.example .env.devtool
 vim .env.tunnel
 ```
 
-### Tunnel Configuration (`.env.tunnel`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TUN_SOURCE_IP` | Source IP for the tunnel interface | `10.0.0.2` |
-| `TUN_DEST_IP` | Destination IP for the tunnel interface | `10.0.0.1` |
-| `TUN_FORWARD_HOST` | Host to forward UDP packets to | `127.0.0.1` |
-| `TUN_FORWARD_PORT` | Port to forward UDP packets to | `8080` |
-
-### UDP Server Configuration (`.env.server`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SERVER_PORT` | Port to listen on | `8080` |
-
-### Devtool Configuration (`.env.devtool`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DEVTOOL_HOST` | Destination host for UDP packets | `10.0.0.1` |
-| `DEVTOOL_PORT` | Destination port for UDP packets | `8080` |
-| `DEVTOOL_MSG` | Message to send | `hello from devtool` |
-| `DEVTOOL_TIMEOUT` | Response timeout | `2s` |
+See the `.env.*.example` files for available variables and their descriptions.
 
 ## Local Testing
 
@@ -162,14 +140,6 @@ To customize the message, edit `.env.devtool`:
 ```bash
 DEVTOOL_MSG=hello tunnel
 ```
-
-### What Happens
-
-1. The `udp-send` command sends a UDP packet to `10.0.0.1:8080`
-2. The routing table directs packets for `10.0.0.1` through the utun interface
-3. The tunnel intercepts the packet and logs it
-4. The `forwardUDP` function extracts the UDP payload and forwards it to `127.0.0.1:8080`
-5. The UDP server receives the packet and sends back an `ACK` response
 
 ### Direct Testing (without tunnel)
 
