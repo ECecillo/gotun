@@ -8,10 +8,6 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
-type config struct {
-	Port int `env:"SERVER_PORT" envDefault:"8080"`
-}
-
 func main() {
 	cfg, err := env.ParseAs[config]()
 	if err != nil {
