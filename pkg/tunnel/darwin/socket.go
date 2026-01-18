@@ -9,6 +9,9 @@ import (
 
 // OpenKernelControlSocket create and return the id of the file descriptor
 // opened to the kernel control.
+//
+// The caller is responsible of closing the socket by calling unix.Close(fd) and
+// handle any error.
 func OpenKernelControlSocket() (int, error) {
 	// fd : file descriptor
 	// reminder: when we ask to the kernel to create a socket, a file is created somewhere
@@ -35,6 +38,9 @@ func OpenKernelControlSocket() (int, error) {
 
 // OpenKernelNetworkManagerSocket create and return the id of the file descriptor
 // opened to the network manager that handle all the operation regarding network stack.
+//
+// The caller is responsible of closing the socket by calling unix.Close(fd) and
+// handle any error.
 func OpenKernelNetworkManagerSocket() (int, error) {
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
 	if err != nil {
