@@ -33,12 +33,12 @@ profile.cov
 go.work
 go.work.sum
 
-# env files (keep .env.example tracked)
+# env files (keep .example files tracked)
 .env
 .env.tunnel
 .env.server
 .env.devtool
-!.env.example
+!.env.*.example
 
 # Editor/IDE
 # .idea/

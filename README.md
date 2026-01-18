@@ -89,16 +89,14 @@ All commands are configured via environment variables using the [env](https://gi
 
 ### Setup
 
-Copy the example file and create your env files:
+Copy the example files to create your env files:
 ```bash
-# View the example with all available variables
-cat .env.example
+cp .env.tunnel.example .env.tunnel
+cp .env.server.example .env.server
+cp .env.devtool.example .env.devtool
 
-# Create env files (already provided with defaults)
-# Edit as needed:
-# - .env.tunnel
-# - .env.server
-# - .env.devtool
+# Edit as needed
+vim .env.tunnel
 ```
 
 ### Tunnel Configuration (`.env.tunnel`)
