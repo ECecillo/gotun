@@ -14,6 +14,7 @@ type config struct {
 	ForwardHost     string        `env:"TUN_FORWARD_HOST"`
 	ForwardPort     int           `env:"TUN_FORWARD_PORT" envDefault:"8080"`
 	ResponseTimeout time.Duration `env:"TUN_RESPONSE_TIMEOUT" envDefault:"5s"`
+	TCPIdleTimeout  time.Duration `env:"TUN_TCP_IDLE_TIMEOUT" envDefault:"60s"`
 }
 
 // Validate checks that the configuration values are valid.

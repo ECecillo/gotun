@@ -4,6 +4,9 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"ececillo/gotun/pkg/tunnel"
 	"ececillo/gotun/pkg/tunnel/darwin"
@@ -42,10 +45,26 @@ func main() {
 
 	log.Printf("Tunnel created successfully: %s (fd: %d)", tun.Name, tun.FD)
 	log.Printf("Response timeout: %s", cfg.ResponseTimeout)
+	log.Printf("TCP idle timeout: %s", cfg.TCPIdleTimeout)
 
-	forwarder := NewUDPForwarder(tun.FD, cfg.ForwardAddr(), cfg.ResponseTimeout)
-	reader := NewTunnelReader(tun.FD, tun.Name, forwarder)
+	// Create forwarders
+	udpForwarder := NewUDPForwarder(tun.FD, cfg.ForwardAddr(), cfg.ResponseTimeout)
+	tcpForwarder := NewTCPForwarder(tun.FD, cfg.TCPIdleTimeout)
+
+	forwarders := map[uint8]ProtocolForwarder{
+		ProtocolUDP: udpForwarder,
+		ProtocolTCP: tcpForwarder,
+	}
+
+	reader := NewTunnelReader(tun.FD, tun.Name, forwarders)
+
+	// Handle graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go reader.Run()
-	select {}
+
+	<-sigChan
+	log.Printf("🛑 Shutting down...")
+	reader.Close()
 }

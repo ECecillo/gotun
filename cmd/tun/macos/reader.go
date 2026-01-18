@@ -10,19 +10,25 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// ProtocolForwarder is an interface for forwarding IP packets by protocol.
+type ProtocolForwarder interface {
+	Forward(ipPacket []byte) error
+	Close() error
+}
+
 // TunnelReader reads packets from a utun interface and processes them.
 type TunnelReader struct {
-	fd        int
-	name      string
-	forwarder *UDPForwarder
+	fd         int
+	name       string
+	forwarders map[uint8]ProtocolForwarder
 }
 
 // NewTunnelReader creates a new TunnelReader.
-func NewTunnelReader(fd int, name string, forwarder *UDPForwarder) *TunnelReader {
+func NewTunnelReader(fd int, name string, forwarders map[uint8]ProtocolForwarder) *TunnelReader {
 	return &TunnelReader{
-		fd:        fd,
-		name:      name,
-		forwarder: forwarder,
+		fd:         fd,
+		name:       name,
+		forwarders: forwarders,
 	}
 }
 
@@ -90,10 +96,20 @@ func (r *TunnelReader) handlePacket(ipPacket []byte) {
 		fmt.Printf("   Source: %s -> Destination: %s\n", srcIP, dstIP)
 	}
 
-	// Forward UDP packets
-	if protocol == ProtocolUDP {
-		if err := r.forwarder.ForwardAndRespond(ipPacket); err != nil {
+	// Dispatch to appropriate forwarder
+	if forwarder, ok := r.forwarders[protocol]; ok {
+		if err := forwarder.Forward(ipPacket); err != nil {
 			log.Printf("❌ %v", err)
 		}
 	}
+}
+
+// Close closes all forwarders.
+func (r *TunnelReader) Close() error {
+	for _, f := range r.forwarders {
+		if err := f.Close(); err != nil {
+			log.Printf("⚠️  Error closing forwarder: %v", err)
+		}
+	}
+	return nil
 }

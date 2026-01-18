@@ -37,8 +37,9 @@ func NewUDPForwarder(utunFD int, forwardAddr *net.UDPAddr, responseTimeout time.
 	}
 }
 
-// ForwardAndRespond forwards a UDP packet and writes any response back to the utun.
-func (f *UDPForwarder) ForwardAndRespond(ipPacket []byte) error {
+// Forward forwards a UDP packet and writes any response back to the utun.
+// Implements ProtocolForwarder interface.
+func (f *UDPForwarder) Forward(ipPacket []byte) error {
 	info, err := parseUDPPacket(ipPacket)
 	if err != nil {
 		return fmt.Errorf("failed to parse UDP packet: %w", err)
@@ -145,5 +146,10 @@ func (f *UDPForwarder) writeResponseToTun(originalInfo *udpPacketInfo, responseP
 	}
 
 	log.Printf("📨 Wrote %d bytes response to utun (payload: %d bytes)", n, len(responsePayload))
+	return nil
+}
+
+// Close implements ProtocolForwarder interface (no-op for UDP).
+func (f *UDPForwarder) Close() error {
 	return nil
 }
