@@ -101,7 +101,7 @@ func (rc *IPRouterConfigurator) addRouteToInterface(destinationIP net.IP, ifName
 		if err == unix.EEXIST {
 			return nil
 		}
-		return fmt.Errorf("unable to write message buffer to ip router: %w", err)
+		return fmt.Errorf("unable to write message buffer to ip router, err: %w", err)
 	}
 
 	log.Println("successfully wrote message into ip router socket")
