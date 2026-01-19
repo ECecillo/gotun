@@ -84,7 +84,6 @@ func NewTCPForwarder(utunFD int, idleTimeout time.Duration) *TCPForwarder {
 }
 
 // Forward processes an incoming TCP packet.
-// Implements ProtocolForwarder interface.
 func (f *TCPForwarder) Forward(ipPacket []byte) error {
 	info, err := parseTCPPacket(ipPacket)
 	if err != nil {
@@ -525,3 +524,5 @@ func flagsToString(f tcpFlags) string {
 	}
 	return s[:len(s)-1]
 }
+
+var _ ProtocolForwarder = new(TCPForwarder)
