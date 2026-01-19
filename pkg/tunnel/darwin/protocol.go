@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package darwin
 
 // Protocol numbers (RFC 790)
 const (

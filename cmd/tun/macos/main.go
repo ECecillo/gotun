@@ -48,15 +48,15 @@ func main() {
 	log.Printf("TCP idle timeout: %s", cfg.TCPIdleTimeout)
 
 	// Create forwarders
-	udpForwarder := NewUDPForwarder(tun.FD, cfg.ForwardAddr(), cfg.ResponseTimeout)
-	tcpForwarder := NewTCPForwarder(tun.FD, cfg.TCPIdleTimeout)
+	udpForwarder := darwin.NewUDPForwarder(tun.FD, cfg.ForwardAddr(), cfg.ResponseTimeout)
+	tcpForwarder := darwin.NewTCPForwarder(tun.FD, cfg.TCPIdleTimeout)
 
-	forwarders := map[uint8]ProtocolForwarder{
-		ProtocolUDP: udpForwarder,
-		ProtocolTCP: tcpForwarder,
+	forwarders := map[uint8]darwin.ProtocolForwarder{
+		darwin.ProtocolUDP: udpForwarder,
+		darwin.ProtocolTCP: tcpForwarder,
 	}
 
-	reader := NewTunnelReader(tun.FD, tun.Name, forwarders)
+	reader := darwin.NewTunnelReader(tun.FD, tun.Name, forwarders)
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
