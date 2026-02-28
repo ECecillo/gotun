@@ -72,6 +72,18 @@ just
 | `just clean` | Remove build artifacts and caches |
 | `just security` | Run security checks with gosec |
 
+## Code Validation
+
+Before committing new changes, run:
+
+```bash
+just test
+just lint
+just fmt
+```
+
+This helps catch test failures, lint issues, and ensures consistent formatting before code review.
+
 ## Configuration
 
 All commands are configured via environment variables using the [env](https://github.com/caarlos0/env) package. Each command has its own `.env` file:
