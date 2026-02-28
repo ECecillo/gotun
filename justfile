@@ -64,7 +64,7 @@ clean:
 
 # Format code
 fmt:
-    go fmt ./...
+    gofmt -s -w $(find ./. -type f -name "*.go" -not -path "./vendor/*")
 
 # Run linter (requires golangci-lint)
 lint:
