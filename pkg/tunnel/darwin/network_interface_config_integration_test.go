@@ -21,7 +21,7 @@ func TestInterfaceConfigurator_ConfigureInterface_Integration(t *testing.T) {
 	tunName := createTestTunnel(t)
 
 	// Create interface configurator
-	configurator, err := darwin.NewInterfaceConfigurator()
+	configurator, err := darwin.NewNetworkInterfaceConfigurator()
 	if err != nil {
 		t.Fatalf("failed to create interface configurator: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestInterfaceConfigurator_ConfigureInterface_Integration(t *testing.T) {
 	sourceIP := net.ParseIP("10.0.88.2").To4()
 	destIP := net.ParseIP("10.0.88.1").To4()
 
-	err = configurator.ConfigureInterface(tunName, sourceIP, destIP)
+	err = configurator.Configure(tunName, sourceIP, destIP)
 	if err != nil {
 		t.Fatalf("failed to configure interface: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestInterfaceConfigurator_Lifecycle_Integration(t *testing.T) {
 
 	// Test creating and closing configurator multiple times
 	for i := 0; i < 3; i++ {
-		configurator, err := darwin.NewInterfaceConfigurator()
+		configurator, err := darwin.NewNetworkInterfaceConfigurator()
 		if err != nil {
 			t.Fatalf("iteration %d: failed to create configurator: %v", i, err)
 		}
@@ -77,7 +77,7 @@ func TestInterfaceConfigurator_MultipleInterfaces_Integration(t *testing.T) {
 	}
 
 	// Configure all tunnels
-	configurator, err := darwin.NewInterfaceConfigurator()
+	configurator, err := darwin.NewNetworkInterfaceConfigurator()
 	if err != nil {
 		t.Fatalf("failed to create configurator: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestInterfaceConfigurator_MultipleInterfaces_Integration(t *testing.T) {
 		sourceIP := net.ParseIP(fmt.Sprintf("10.0.%d.2", 80+i)).To4()
 		destIP := net.ParseIP(fmt.Sprintf("10.0.%d.1", 80+i)).To4()
 
-		err := configurator.ConfigureInterface(tunName, sourceIP, destIP)
+		err := configurator.Configure(tunName, sourceIP, destIP)
 		if err != nil {
 			t.Errorf("failed to configure tunnel %d (%s): %v", i, tunName, err)
 			continue
@@ -129,7 +129,7 @@ func TestInterfaceConfigurator_DifferentIPRanges_Integration(t *testing.T) {
 		},
 	}
 
-	configurator, err := darwin.NewInterfaceConfigurator()
+	configurator, err := darwin.NewNetworkInterfaceConfigurator()
 	if err != nil {
 		t.Fatalf("failed to create configurator: %v", err)
 	}
@@ -145,9 +145,9 @@ func TestInterfaceConfigurator_DifferentIPRanges_Integration(t *testing.T) {
 			sourceIP := net.ParseIP(tt.sourceIP).To4()
 			destIP := net.ParseIP(tt.destIP).To4()
 
-			err := configurator.ConfigureInterface(tunName, sourceIP, destIP)
+			err := configurator.Configure(tunName, sourceIP, destIP)
 			if (err != nil) != tt.shouldErr {
-				t.Errorf("ConfigureInterface() error = %v, wantErr %v", err, tt.shouldErr)
+				t.Errorf("Configure() error = %v, wantErr %v", err, tt.shouldErr)
 				return
 			}
 
