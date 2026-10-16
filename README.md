@@ -1,10 +1,20 @@
 # gotun
 
-A macOS userspace tunnel (UTUN) implementation in Go that creates and configures network interfaces using kernel control sockets.
+[![Test](https://github.com/ECecillo/gotun/actions/workflows/test.yml/badge.svg)](https://github.com/ECecillo/gotun/actions/workflows/test.yml)
+[![Lint](https://github.com/ECecillo/gotun/actions/workflows/lint.yml/badge.svg)](https://github.com/ECecillo/gotun/actions/workflows/lint.yml)
+[![Format](https://github.com/ECecillo/gotun/actions/workflows/format.yml/badge.svg)](https://github.com/ECecillo/gotun/actions/workflows/format.yml)
+
+**gotun is a macOS-only userspace tunnel (UTUN) written in Go.** It creates and configures `utunN` network interfaces directly through macOS kernel control sockets, then forwards TCP and UDP traffic through the tunnel in user space.
 
 ## Platform Support
 
 **macOS only** - This project uses macOS-specific kernel control interfaces (`com.apple.net.utun_control`) and will not compile or run on Linux or Windows.
+
+## Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a code-level description of
+the components, the UTUN bring-up sequence, the packet read loop, and the
+TCP/UDP forwarding paths.
 
 ## Prerequisites
 
@@ -83,6 +93,32 @@ just fmt
 ```
 
 This helps catch test failures, lint issues, and ensures consistent formatting before code review.
+
+## Testing
+
+There are two test suites: fast unit tests that run anywhere, and integration
+tests that create real UTUN interfaces and therefore require macOS and root.
+
+### Unit tests (no root)
+
+The pure logic (packet parse/build, checksums, protocol helpers, connection
+bookkeeping) is covered by unit tests that do **not** use the `integration`
+build tag and need no privileges:
+
+```bash
+go test -race ./...
+# or: just test   (adds a coverage profile)
+```
+
+### Integration tests (require root, macOS)
+
+The integration tests are guarded by the `integration` build tag and actually
+bring up `utunN` interfaces, so they must run as root on macOS:
+
+```bash
+sudo -E env "PATH=$PATH" go test -race -tags integration ./...
+# or: sudo -E just test-integration
+```
 
 ## Configuration
 
@@ -223,25 +259,27 @@ Always review code before running with sudo.
 
 ## CI/CD
 
-The project includes GitHub Actions workflows for automated code quality checks:
+The project runs three GitHub Actions workflows on every push to `main` and on
+all pull requests, all on macOS runners:
+
+### Test Workflow
+
+- Runs the unit tests with the race detector and a coverage profile
+  (`go test -race -coverprofile=coverage.out ./...`).
+- Runs the integration tests as root with the `integration` build tag
+  (`sudo -E env "PATH=$PATH" go test -race -tags integration ./...`); GitHub's
+  macOS runners provide passwordless `sudo`.
+- Uploads the unit coverage profile to Codecov.
 
 ### Lint Workflow
 
-Runs on every push to `main` and all pull requests:
-
-- Executes golangci-lint with 5-minute timeout
-- Checks for code quality issues and best practices
-- Fails build if any linting issues are found
+- Executes golangci-lint with a 5-minute timeout.
+- Fails the build if any linting issues are found.
 
 ### Format Workflow
 
-Runs on every push to `main` and all pull requests:
-
-- Checks code formatting with gofmt
-- Ensures all Go files follow standard formatting
-- Fails build if any files are not properly formatted
-
-**Note**: The test workflow has been removed as tests cannot run in Linux CI environments (this is macOS-only code).
+- Checks formatting with `gofmt -l .`.
+- Fails the build if any files are not properly formatted.
 
 ## Troubleshooting
 
